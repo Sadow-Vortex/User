@@ -110,23 +110,31 @@ public class UserController {
         }
         return  new ResponseEntity<>(HttpStatus.OK);
     }
-    @GetMapping("/login")
-    public ResponseEntity<ApiResponse<User>> getUserByNameAndPassword(@PathVariable String number, @PathVariable String password) {
-        Optional<User> useropt = userRepository.findByNumber(number);
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<User>> login(
+            @RequestBody User user) {
+
+        Optional<User> useropt =
+                userService.login(user.getNumber(), user.getPassword());
+
         if (useropt.isEmpty()) {
-            ApiResponse<User> response = new ApiResponse<>(
-                    HttpStatus.NOT_FOUND.value(),
-                    "Error",
-                    null
+            return ResponseEntity.ok(
+                    new ApiResponse<>(
+                            HttpStatus.UNAUTHORIZED.value(),
+                            "Invalid number or password",
+                            null
+                    )
             );
         }
-        Optional<User> us = userService.login(number, password);
-        ApiResponse<User> response = new ApiResponse<User>(
-                HttpStatus.OK.value(),
-                "Success",
-                null
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(
+                        HttpStatus.OK.value(),
+                        "Login success",
+                        useropt.get()
+                )
         );
-        return new ResponseEntity<>(response, HttpStatus.OK);
     }
+
 }
 

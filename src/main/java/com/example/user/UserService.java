@@ -37,14 +37,10 @@ public class UserService {
         return optionalUser;
     }
 
-    public Optional<User> login(String number, String password){
-        Optional<User> optionalUser = userRepository.findByNumber(number);
-        if (optionalUser.isPresent()){
-            if (optionalUser.get().getPassword().equals(password)){
-                return optionalUser;
-            }
-        }
-        return null;
+    public Optional<User> login(String number, String password) {
+
+        return userRepository.findByNumber(number)
+                .filter(user -> user.getPassword().equals(password));
     }
 }
 
