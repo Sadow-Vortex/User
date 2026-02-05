@@ -21,6 +21,29 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    private String profileImage;
+    private String backImage;
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getProfileImage() {
+        return profileImage;
+    }
+
+    public void setProfileImage(String profileImage) {
+        this.profileImage = profileImage;
+    }
+
+    public String getBackImage() {
+        return backImage;
+    }
+
+    public void setBackImage(String backImage) {
+        this.backImage = backImage;
+    }
+
     public User() {}
 
     public User(String name, String email, String number, String password) {

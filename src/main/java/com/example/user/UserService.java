@@ -32,6 +32,8 @@ public class UserService {
             optionalUser.get().setName(user.getName());
             optionalUser.get().setPassword(user.getPassword());
             optionalUser.get().setNumber(user.getNumber());
+            optionalUser.get().setBackImage(user.getBackImage());
+            optionalUser.get().setProfileImage(user.getProfileImage());
             userRepository.save(optionalUser.get());
         }
         return optionalUser;

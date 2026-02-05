@@ -35,16 +35,36 @@ public class UserController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/add")
+    @PostMapping("/")
     public ResponseEntity<ApiResponse<User>> addUser(@RequestBody User user) {
-        User us = userService.save(user);
-        ApiResponse<User> response = new ApiResponse<>(
-                HttpStatus.OK.value(),
-                "Success",
-                us
-        );
-        return new ResponseEntity<>(response, HttpStatus.OK);
+        System.out.println("API HIT");
+
+        try {
+
+            User us = userService.save(user);
+
+            ApiResponse<User> response = new ApiResponse<>(
+                    HttpStatus.OK.value(),
+                    "Success",
+                    us
+            );
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+
+            e.printStackTrace();   // IMPORTANT for you now
+
+            ApiResponse<User> response = new ApiResponse<>(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Email or number already exists",
+                    null
+            );
+
+            return ResponseEntity.badRequest().body(response);
+        }
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<User>> getUserById(@PathVariable long id) {
