@@ -4,6 +4,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Map;
+import java.util.UUID;
 
 import java.util.List;
 import java.util.Optional;
@@ -108,6 +115,7 @@ public class UserController {
         }
         return  new ResponseEntity<>(HttpStatus.OK);
     }
+
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<ApiResponse<User>> deleteUser(@PathVariable long id) {
         Optional<User> useropt = userRepository.findById(id);
@@ -130,6 +138,7 @@ public class UserController {
         }
         return  new ResponseEntity<>(HttpStatus.OK);
     }
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<User>> login(
             @RequestBody User user) {
@@ -156,5 +165,38 @@ public class UserController {
         );
     }
 
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "File is empty")
+            );
+        }
+
+        try {
+
+            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+
+            Path uploadPath = Paths.get("uploads");
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            Path filePath = uploadPath.resolve(fileName);
+
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            return ResponseEntity.ok(Map.of("filename", fileName));
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Upload failed"));
+        }
+    }
 }
 
