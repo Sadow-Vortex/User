@@ -2,5 +2,6 @@ services:
   - type: web
     name: user-api
     env: java
+    plan: free
     buildCommand: ./mvnw clean install
     startCommand: java -jar target/*.jar
