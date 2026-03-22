@@ -1,5 +1,7 @@
 package com.example.user;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,8 @@ public class UserController {
     private UserService userService;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private Cloudinary cloudinary;
 
     @GetMapping("/")
     public ResponseEntity<ApiResponse<List<User>>> getAllUsers() {
@@ -168,34 +172,15 @@ public class UserController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
 
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("error", "File is empty")
-            );
-        }
-
         try {
+            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.emptyMap());
 
-            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String imageUrl = uploadResult.get("secure_url").toString();
 
-            Path uploadPath = Paths.get("uploads");
-
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            Path filePath = uploadPath.resolve(fileName);
-
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            return ResponseEntity.ok(Map.of("filename", fileName));
+            return ResponseEntity.ok(Map.of("url", imageUrl));
 
         } catch (Exception e) {
-
-            e.printStackTrace();
-
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Upload failed"));
+            return ResponseEntity.status(500).body("Upload failed");
         }
     }
 }
