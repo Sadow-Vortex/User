@@ -172,15 +172,34 @@ public class UserController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
 
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "File is empty")
+            );
+        }
+
         try {
-            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.emptyMap());
 
-            String imageUrl = uploadResult.get("secure_url").toString();
+            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
 
-            return ResponseEntity.ok(Map.of("url", imageUrl));
+            Path uploadPath = Paths.get("uploads");
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            Path filePath = uploadPath.resolve(fileName);
+
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            return ResponseEntity.ok(Map.of("filename", fileName));
 
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Upload failed");
+
+            e.printStackTrace();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Upload failed"));
         }
     }
 }
