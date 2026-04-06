@@ -1,13 +1,12 @@
 package com.example.user;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Random;
@@ -16,119 +15,101 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class OtpService {
 
-    @Autowired
-    private JavaMailSender mailSender;
+    @Value("${resend.api.key}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.username}")
+    @Value("${resend.from.email}")
     private String fromEmail;
 
     // In-memory store: email -> OtpRecord
     private final Map<String, OtpRecord> otpStore = new ConcurrentHashMap<>();
-
     private static final int OTP_EXPIRY_MINUTES = 10;
 
     // ─── Inner record ─────────────────────────────────────────────────────────
     private static class OtpRecord {
         final String otp;
         final LocalDateTime createdAt;
-
-        OtpRecord(String otp) {
-            this.otp = otp;
-            this.createdAt = LocalDateTime.now();
-        }
-
+        OtpRecord(String otp) { this.otp = otp; this.createdAt = LocalDateTime.now(); }
         boolean isExpired() {
             return LocalDateTime.now().isAfter(createdAt.plusMinutes(OTP_EXPIRY_MINUTES));
         }
     }
 
-    // ─── Generate & Send OTP via Email ────────────────────────────────────────
-    public void sendOtp(String toEmail) throws MessagingException {
+    // ─── Generate & Send OTP via Resend HTTPS API (works on Render) ──────────
+    public void sendOtp(String toEmail) throws Exception {
         String otp = generateOtp();
         otpStore.put(toEmail.toLowerCase(), new OtpRecord(otp));
 
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        String html = buildEmailHtml(otp)
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "");
 
-        helper.setFrom(fromEmail);
-        helper.setTo(toEmail);
-        helper.setSubject("Your Kisan Seva Verification Code");
-        helper.setText(buildEmailHtml(otp), true); // true = HTML
+        String json = "{"
+            + "\"from\":\"" + fromEmail + "\","
+            + "\"to\":[\"" + toEmail + "\"],"
+            + "\"subject\":\"Your Kisan Seva Verification Code\","
+            + "\"html\":\"" + html + "\""
+            + "}";
 
-        mailSender.send(message);
-        System.out.println("[OtpService] OTP sent to " + toEmail); // remove in production
+        URL url = new URL("https://api.resend.com/emails");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Authorization", "Bearer " + resendApiKey);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(json.getBytes(StandardCharsets.UTF_8));
+        }
+
+        int code = conn.getResponseCode();
+        if (code != 200 && code != 201) {
+            String err = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+            throw new RuntimeException("Resend API error " + code + ": " + err);
+        }
+
+        System.out.println("[OtpService] OTP sent to " + toEmail);
     }
 
     // ─── Verify OTP ──────────────────────────────────────────────────────────
     public OtpVerifyResult verifyOtp(String email, String otp) {
         String key = email.toLowerCase();
         OtpRecord record = otpStore.get(key);
-
-        if (record == null)        return OtpVerifyResult.NOT_FOUND;
-        if (record.isExpired()) {
-            otpStore.remove(key);  return OtpVerifyResult.EXPIRED;
-        }
-        if (!record.otp.equals(otp)) return OtpVerifyResult.INVALID;
-
-        otpStore.remove(key);      // used — remove so it can't be reused
+        if (record == null)           return OtpVerifyResult.NOT_FOUND;
+        if (record.isExpired()) { otpStore.remove(key); return OtpVerifyResult.EXPIRED; }
+        if (!record.otp.equals(otp))  return OtpVerifyResult.INVALID;
+        otpStore.remove(key);
         return OtpVerifyResult.SUCCESS;
     }
 
-    // ─── HTML Email Template ─────────────────────────────────────────────────
+    // ─── HTML Email ───────────────────────────────────────────────────────────
     private String buildEmailHtml(String otp) {
-        return """
-            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;
-                        border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
-
-              <!-- Header -->
-              <div style="background: #2f6df6; padding: 28px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 26px; letter-spacing: 1px;">
-                  🌾 Kisan Seva
-                </h1>
-                <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">
-                  Farm to Doorstep
-                </p>
-              </div>
-
-              <!-- Body -->
-              <div style="padding: 32px; background: #ffffff;">
-                <p style="color: #333; font-size: 15px; margin: 0 0 20px;">
-                  Hello! Use the verification code below to complete your registration.
-                </p>
-
-                <!-- OTP Box -->
-                <div style="text-align: center; margin: 24px 0;">
-                  <span style="display: inline-block; background: #f0f4ff;
-                               border: 2px dashed #2f6df6; border-radius: 12px;
-                               padding: 18px 40px; font-size: 38px; font-weight: 800;
-                               color: #2f6df6; letter-spacing: 10px;">
-                    %s
-                  </span>
-                </div>
-
-                <p style="color: #666; font-size: 13px; text-align: center; margin: 0 0 24px;">
-                  ⏰ This code expires in <strong>10 minutes</strong>.
-                </p>
-
-                <hr style="border: none; border-top: 1px solid #eee; margin: 0 0 20px;" />
-
-                <p style="color: #999; font-size: 12px; margin: 0;">
-                  If you did not request this code, you can safely ignore this email.
-                  Do <strong>not</strong> share this code with anyone.
-                </p>
-              </div>
-
-              <!-- Footer -->
-              <div style="background: #f7f7f7; padding: 16px; text-align: center;">
-                <p style="color: #aaa; font-size: 11px; margin: 0;">
-                  © 2025 Kisan Seva · All rights reserved
-                </p>
-              </div>
-            </div>
-        """.formatted(otp);
+        return "<div style='font-family:Arial,sans-serif;max-width:480px;margin:auto;"
+             + "border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;'>"
+             + "<div style='background:#2f6df6;padding:28px;text-align:center;'>"
+             + "<h1 style='color:#fff;margin:0;font-size:26px;'>🌾 Kisan Seva</h1>"
+             + "<p style='color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;'>Farm to Doorstep</p>"
+             + "</div>"
+             + "<div style='padding:32px;background:#fff;'>"
+             + "<p style='color:#333;font-size:15px;margin:0 0 20px;'>Use the code below to verify your email:</p>"
+             + "<div style='text-align:center;margin:24px 0;'>"
+             + "<span style='display:inline-block;background:#f0f4ff;border:2px dashed #2f6df6;"
+             + "border-radius:12px;padding:18px 40px;font-size:38px;font-weight:800;"
+             + "color:#2f6df6;letter-spacing:10px;'>" + otp + "</span>"
+             + "</div>"
+             + "<p style='color:#666;font-size:13px;text-align:center;'>Expires in <strong>10 minutes</strong>.</p>"
+             + "<hr style='border:none;border-top:1px solid #eee;margin:16px 0;'/>"
+             + "<p style='color:#999;font-size:12px;margin:0;'>Do not share this code with anyone.</p>"
+             + "</div>"
+             + "<div style='background:#f7f7f7;padding:16px;text-align:center;'>"
+             + "<p style='color:#aaa;font-size:11px;margin:0;'>© 2025 Kisan Seva</p>"
+             + "</div></div>";
     }
 
-    // ─── Helper ───────────────────────────────────────────────────────────────
     private String generateOtp() {
         return String.valueOf(100000 + new Random().nextInt(900000));
     }
