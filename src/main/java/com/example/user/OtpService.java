@@ -15,11 +15,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class OtpService {
 
-    @Value("${resend.api.key}")
-    private String resendApiKey;
+    @Value("${BREVO_API_KEY}")
+    private String brevoApiKey  ;
 
-    @Value("${resend.from.email}")
+    @Value("${brevo.from.email}")
     private String fromEmail;
+
+    @Value("${brevo.from.name}")
+    private String fromName;
 
 
     private final Map<String, OtpRecord> otpStore = new ConcurrentHashMap<>();
@@ -45,16 +48,20 @@ public class OtpService {
                 .replace("\r", "");
 
         String json = "{"
-            + "\"from\":\"" + fromEmail + "\","
-            + "\"to\":[\"" + toEmail + "\"],"
-            + "\"subject\":\"Your Kisan Seva Verification Code\","
-            + "\"html\":\"" + html + "\""
-            + "}";
+                + "\"sender\":{"
+                + "\"email\":\"" + fromEmail + "\","
+                + "\"name\":\"" + fromName + "\""
+                + "},"
+                + "\"to\":[{\"email\":\"" + toEmail + "\"}],"
+                + "\"subject\":\"Your Kisan Seva Verification Code\","
+                + "\"htmlContent\":\"" + html + "\""
+                + "}";
 
-        URL url = new URL("https://api.resend.com/emails");
+        URL url = new URL("https://api.brevo.com/v3/smtp/email");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
         conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", "Bearer " + resendApiKey);
+        conn.setRequestProperty("api-key", brevoApiKey);
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
         conn.setConnectTimeout(10000);
@@ -65,12 +72,13 @@ public class OtpService {
         }
 
         int code = conn.getResponseCode();
-        if (code != 200 && code != 201) {
+
+        if (code != 200 && code != 201 && code != 202) {
             String err = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-            throw new RuntimeException("Resend API error " + code + ": " + err);
+            throw new RuntimeException("Brevo API error " + code + ": " + err);
         }
 
-        System.out.println("[OtpService] OTP sent to " + toEmail);
+        System.out.println("[OtpService] OTP sent via Brevo to " + toEmail);
     }
 
     public OtpVerifyResult verifyOtp(String email, String otp) {
