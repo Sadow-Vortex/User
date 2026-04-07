@@ -21,11 +21,10 @@ public class OtpService {
     @Value("${resend.from.email}")
     private String fromEmail;
 
-    // In-memory store: email -> OtpRecord
+
     private final Map<String, OtpRecord> otpStore = new ConcurrentHashMap<>();
     private static final int OTP_EXPIRY_MINUTES = 10;
 
-    // ─── Inner record ─────────────────────────────────────────────────────────
     private static class OtpRecord {
         final String otp;
         final LocalDateTime createdAt;
@@ -35,7 +34,6 @@ public class OtpService {
         }
     }
 
-    // ─── Generate & Send OTP via Resend HTTPS API (works on Render) ──────────
     public void sendOtp(String toEmail) throws Exception {
         String otp = generateOtp();
         otpStore.put(toEmail.toLowerCase(), new OtpRecord(otp));
@@ -75,7 +73,6 @@ public class OtpService {
         System.out.println("[OtpService] OTP sent to " + toEmail);
     }
 
-    // ─── Verify OTP ──────────────────────────────────────────────────────────
     public OtpVerifyResult verifyOtp(String email, String otp) {
         String key = email.toLowerCase();
         OtpRecord record = otpStore.get(key);
@@ -86,7 +83,6 @@ public class OtpService {
         return OtpVerifyResult.SUCCESS;
     }
 
-    // ─── HTML Email ───────────────────────────────────────────────────────────
     private String buildEmailHtml(String otp) {
         return "<div style='font-family:Arial,sans-serif;max-width:480px;margin:auto;"
              + "border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;'>"

@@ -186,7 +186,6 @@ public class UserController {
         if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
             return badReq("Please provide a valid email address");
 
-        // Check if already registered
         if (userRepository.findByEmail(email.trim().toLowerCase()).isPresent())
             return badReq("This email is already registered. Please login instead.");
 
@@ -208,7 +207,6 @@ public class UserController {
         if (req.getEmail() == null || req.getOtp() == null)
             return badReq("Email and OTP are required");
 
-        // Verify the OTP first
         OtpService.OtpVerifyResult result =
                 otpService.verifyOtp(req.getEmail().trim().toLowerCase(), req.getOtp().trim());
 
