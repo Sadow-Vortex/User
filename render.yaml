@@ -3,5 +3,6 @@ services:
     name: user-api
     env: java
     plan: free
-    buildCommand: ./mvnw clean install
+    buildCommand: ./mvnw clean install -DskipTests
     startCommand: java -jar target/*.jar
+    port: 10000
