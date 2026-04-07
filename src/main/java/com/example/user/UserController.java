@@ -217,7 +217,7 @@ public class UserController {
             case SUCCESS   -> { /* fall through */ }
         }
 
-        // OTP verified — create user
+
         try {
             User user = new User(
                     req.getName().trim(),
